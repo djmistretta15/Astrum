@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Astrum · Operator Mission Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;500;600;700&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #050810;
+  --panel:    #0a0f1a;
+  --border:   #1a2540;
+  --border2:  #253055;
+  --accent:   #00c8ff;
+  --accent2:  #0066ff;
+  --green:    #00ff88;
+  --red:      #ff2d55;
+  --orange:   #ff6b35;
+  --yellow:   #ffd60a;
+  --dim:      #4a6080;
+  --text:     #c8d8f0;
+  --text2:    #7a9fcc;
+  --mono:     'Share Tech Mono', monospace;
+  --sans:     'Barlow Condensed', sans-serif;
+  --body:     'Barlow', sans-serif;
+  --glow:     0 0 20px rgba(0,200,255,0.15);
+  --glow2:    0 0 40px rgba(0,200,255,0.08);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 13px;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Scanline overlay */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 9999;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+  pointer-events: none;
+}
+
+/* Grid background */
+body::after {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  background-image:
+    linear-gradient(rgba(0,100,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,100,255,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
+
+/* ── Layout ── */
+.shell {
+  position: relative; z-index: 1;
+  display: grid;
+  grid-template-rows: 52px 1fr;
+  grid-template-columns: 260px 1fr 300px;
+  height: 100vh;
+  gap: 0;
+}
+
+/* ── Header ── */
+header {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px;
+  background: rgba(5,8,16,0.95);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(10px);
+}
+
+.logo {
+  display: flex; align-items: center; gap: 12px;
+  font-family: var(--sans); font-size: 18px; font-weight: 600;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--accent);
+}
+
+.logo-mark {
+  width: 28px; height: 28px;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+  box-shadow: 0 0 12px rgba(0,200,255,0.4);
+  animation: pulse-ring 3s ease-in-out infinite;
+}
+
+@keyframes pulse-ring {
+  0%,100% { box-shadow: 0 0 12px rgba(0,200,255,0.4); }
+  50%      { box-shadow: 0 0 20px rgba(0,200,255,0.7), 0 0 40px rgba(0,200,255,0.2); }
+}
+
+.header-meta {
+  display: flex; align-items: center; gap: 24px;
+  font-family: var(--mono); font-size: 11px; color: var(--dim);
+}
+
+.clock { color: var(--accent); letter-spacing: 0.05em; }
+
+.status-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+  animation: blink 2s step-end infinite;
+}
+@keyframes blink { 50% { opacity: 0.3; } }
+
+.op-selector {
+  display: flex; align-items: center; gap: 10px;
+}
+
+.op-select {
+  background: var(--panel);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  font-family: var(--mono); font-size: 11px;
+  padding: 5px 10px;
+  outline: none;
+  cursor: pointer;
+}
+
+.tier-badge {
+  font-family: var(--sans); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  padding: 3px 8px;
+  border: 1px solid;
+  border-radius: 2px;
+}
+.tier-DEFENSE  { color: var(--red);    border-color: var(--red);    background: rgba(255,45,85,0.1); }
+.tier-PREMIUM  { color: var(--orange); border-color: var(--orange); background: rgba(255,107,53,0.1); }
+.tier-STANDARD { color: var(--accent); border-color: var(--accent); background: rgba(0,200,255,0.1); }
+.tier-FREE     { color: var(--dim);    border-color: var(--dim);    background: transparent; }
+
+/* ── Left panel ── */
+.left-panel {
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+
+.panel-header {
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--sans); font-size: 11px; font-weight: 600;
+  letter-spacing: 0.2em; text-transform: uppercase; color: var(--dim);
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+.panel-header .count {
+  font-family: var(--mono);
+  color: var(--accent); font-size: 13px;
+}
+
+.sat-list { flex: 1; overflow-y: auto; padding: 8px 0; }
+
+.sat-item {
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(26,37,64,0.5);
+  cursor: pointer;
+  transition: background 0.15s;
+  position: relative;
+}
+
+.sat-item:hover { background: rgba(0,100,255,0.05); }
+.sat-item.active { background: rgba(0,200,255,0.07); border-left: 2px solid var(--accent); padding-left: 14px; }
+.sat-item.at-risk { border-left: 2px solid var(--red); padding-left: 14px; }
+.sat-item.at-risk:hover { background: rgba(255,45,85,0.05); }
+
+.sat-name {
+  font-family: var(--sans); font-size: 13px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  margin-bottom: 3px;
+}
+
+.sat-meta {
+  font-family: var(--mono); font-size: 10px; color: var(--dim);
+  display: flex; gap: 10px;
+}
+
+.sat-status {
+  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em;
+  padding: 2px 6px;
+  border: 1px solid;
+  border-radius: 1px;
+}
+.sat-status.nominal { color: var(--green); border-color: var(--green); background: rgba(0,255,136,0.08); }
+.sat-status.warning { color: var(--yellow); border-color: var(--yellow); background: rgba(255,214,10,0.08); animation: blink 1s step-end infinite; }
+.sat-status.critical { color: var(--red); border-color: var(--red); background: rgba(255,45,85,0.08); animation: blink 0.5s step-end infinite; }
+
+/* ── Main content ── */
+.main {
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.main-tabs {
+  display: flex; gap: 0;
+  border-bottom: 1px solid var(--border);
+  background: rgba(10,15,26,0.8);
+  padding: 0 16px;
+}
+
+.tab {
+  font-family: var(--sans); font-size: 12px; font-weight: 600;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  padding: 14px 18px 12px;
+  color: var(--dim);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.tab-content { flex: 1; overflow-y: auto; padding: 16px; display: none; }
+.tab-content.active { display: block; }
+
+/* ── Data cards ── */
+.cards-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+  margin-bottom: 16px;
+}
+
+.metric-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 14px 16px;
+  position: relative;
+  overflow: hidden;
+}
+
+.metric-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 2px;
+}
+.metric-card.blue::before  { background: var(--accent); }
+.metric-card.green::before { background: var(--green); }
+.metric-card.red::before   { background: var(--red); }
+.metric-card.orange::before { background: var(--orange); }
+
+.metric-label {
+  font-family: var(--sans); font-size: 10px; font-weight: 600;
+  letter-spacing: 0.2em; text-transform: uppercase; color: var(--dim);
+  margin-bottom: 8px;
+}
+
+.metric-value {
+  font-family: var(--mono); font-size: 28px;
+  line-height: 1;
+  color: var(--text);
+}
+.metric-value.accent { color: var(--accent); }
+.metric-value.green  { color: var(--green); }
+.metric-value.red    { color: var(--red); }
+.metric-value.orange { color: var(--orange); }
+
+.metric-sub {
+  font-family: var(--mono); font-size: 10px; color: var(--dim);
+  margin-top: 4px;
+}
+
+/* ── Table ── */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono); font-size: 11px;
+}
+
+.data-table thead th {
+  font-family: var(--sans); font-size: 10px; font-weight: 600;
+  letter-spacing: 0.15em; text-transform: uppercase; color: var(--dim);
+  padding: 8px 12px; text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.data-table tbody tr {
+  border-bottom: 1px solid rgba(26,37,64,0.5);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.data-table tbody tr:hover { background: rgba(0,100,255,0.04); }
+
+.data-table tbody td {
+  padding: 9px 12px;
+  vertical-align: middle;
+}
+
+.risk-pill {
+  display: inline-block;
+  font-family: var(--sans); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 2px 7px;
+  border: 1px solid;
+  border-radius: 1px;
+}
+.risk-CRITICAL { color: var(--red);    border-color: var(--red);    background: rgba(255,45,85,0.12); }
+.risk-HIGH     { color: var(--orange); border-color: var(--orange); background: rgba(255,107,53,0.12); }
+.risk-MEDIUM   { color: var(--yellow); border-color: var(--yellow); background: rgba(255,214,10,0.10); }
+.risk-LOW, .risk-INFO, .risk-NOMINAL { color: var(--dim); border-color: var(--border2); background: transparent; }
+
+/* ── Simulation ── */
+.scenario-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
+  margin-bottom: 20px;
+}
+
+.scenario-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.scenario-card:hover {
+  border-color: var(--accent);
+  background: rgba(0,200,255,0.04);
+}
+
+.scenario-card::after {
+  content: '▶ RUN';
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+  font-family: var(--sans); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--accent);
+  opacity: 0; transition: opacity 0.2s;
+}
+.scenario-card:hover::after { opacity: 1; }
+
+.scenario-type {
+  font-family: var(--sans); font-size: 9px; font-weight: 700;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.scenario-type.ASAT_TEST { color: var(--red); }
+.scenario-type.HYPERVELOCITY { color: var(--orange); }
+.scenario-type.BATTERY_EXPLOSION { color: var(--yellow); }
+
+.scenario-name {
+  font-family: var(--sans); font-size: 14px; font-weight: 600;
+  margin-bottom: 6px; color: var(--text);
+  padding-right: 50px;
+}
+
+.scenario-meta {
+  font-family: var(--mono); font-size: 10px; color: var(--dim);
+}
+
+/* Simulation result */
+#sim-result {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 20px;
+  display: none;
+  margin-top: 16px;
+}
+
+#sim-result.visible { display: block; }
+
+.kessler-bar {
+  height: 8px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  margin: 8px 0 4px;
+}
+
+.kessler-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 1s ease;
+  background: linear-gradient(90deg, var(--green), var(--yellow), var(--red));
+}
+
+.cascade-timeline {
+  display: grid; grid-template-columns: repeat(10, 1fr);
+  gap: 4px; margin-top: 12px;
+}
+
+.timeline-bar-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.timeline-bar {
+  width: 100%; background: rgba(0,200,255,0.15);
+  border: 1px solid rgba(0,200,255,0.2);
+  position: relative;
+  min-height: 4px;
+  transition: height 0.5s ease;
+}
+.timeline-label { font-family: var(--mono); font-size: 8px; color: var(--dim); white-space: nowrap; }
+
+.alert-seq { margin-top: 16px; }
+.alert-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid rgba(26,37,64,0.4);
+  font-family: var(--mono); font-size: 10px;
+  animation: slide-in 0.3s ease;
+}
+@keyframes slide-in { from { opacity:0; transform: translateX(-10px); } }
+
+.alert-time { color: var(--dim); width: 70px; flex-shrink: 0; }
+.alert-op   { color: var(--text); width: 100px; flex-shrink: 0; }
+.alert-sat  { color: var(--accent2); flex: 1; }
+.alert-level { flex-shrink: 0; }
+
+/* ── Right panel ── */
+.right-panel {
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+
+.detail-header {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.detail-sat-name {
+  font-family: var(--sans); font-size: 16px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.detail-norad {
+  font-family: var(--mono); font-size: 11px; color: var(--dim);
+}
+
+.detail-body { flex: 1; overflow-y: auto; padding: 0; }
+
+.detail-section {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.detail-section-title {
+  font-family: var(--sans); font-size: 9px; font-weight: 700;
+  letter-spacing: 0.2em; text-transform: uppercase; color: var(--dim);
+  margin-bottom: 10px;
+}
+
+.kv-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 4px 0;
+  font-family: var(--mono); font-size: 11px;
+}
+.kv-key   { color: var(--dim); }
+.kv-value { color: var(--text); text-align: right; }
+.kv-value.accent { color: var(--accent); }
+.kv-value.green  { color: var(--green); }
+.kv-value.red    { color: var(--red); }
+
+/* ── SSE indicator ── */
+.sse-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--dim);
+  display: inline-block; margin-right: 5px;
+}
+.sse-dot.connected { background: var(--green); box-shadow: 0 0 6px var(--green); }
+
+/* ── Loading ── */
+.loading {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; padding: 40px;
+  color: var(--dim); font-family: var(--mono); font-size: 11px;
+}
+
+.spinner {
+  width: 24px; height: 24px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── CDM button ── */
+.btn {
+  font-family: var(--sans); font-size: 11px; font-weight: 600;
+  letter-spacing: 0.15em; text-transform: uppercase;
+  padding: 7px 14px;
+  border: 1px solid;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-accent { color: var(--accent); border-color: var(--accent); }
+.btn-accent:hover { background: rgba(0,200,255,0.1); }
+.btn-red    { color: var(--red);    border-color: var(--red); }
+.btn-red:hover { background: rgba(255,45,85,0.1); }
+.btn-sim    { color: var(--orange); border-color: var(--orange); }
+.btn-sim:hover { background: rgba(255,107,53,0.1); }
+.btn-green  { color: var(--green);  border-color: var(--green); }
+.btn-green:hover { background: rgba(0,255,136,0.1); }
+
+.empty-state {
+  padding: 30px 16px;
+  text-align: center;
+  font-family: var(--mono); font-size: 11px; color: var(--dim);
+}
+
+/* ── Threat feed section ── */
+.threat-card {
+  background: rgba(255,45,85,0.06);
+  border: 1px solid rgba(255,45,85,0.2);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+}
+.threat-indicator-HIGH     { border-left: 3px solid var(--red); }
+.threat-indicator-MODERATE { border-left: 3px solid var(--orange); }
+.threat-indicator-LOW      { border-left: 3px solid var(--dim); }
+
+.threat-score-bar { margin: 8px 0; }
+.threat-bar-bg { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.threat-bar-fill { height: 100%; background: var(--red); border-radius: 2px; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--dim); }
+
+/* Animate in */
+.panel-header, .left-panel, .right-panel { animation: fade-up 0.4s ease; }
+@keyframes fade-up { from { opacity: 0; transform: translateY(4px); } }
+
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- ── Header ── -->
+<header>
+  <div class="logo">
+    <div class="logo-mark">◎</div>
+    ASTRUM · OPERATOR PORTAL
+  </div>
+  <div class="header-meta">
+    <span class="sse-dot" id="sse-dot"></span>
+    <span id="sse-status" style="font-size:10px">connecting...</span>
+    &nbsp;|&nbsp;
+    <span class="clock" id="clock">--:--:-- UTC</span>
+    &nbsp;|&nbsp;
+    <div class="op-selector">
+      <select class="op-select" id="op-select" onchange="selectOperator(this.value)">
+        <option value="">— SELECT OPERATOR —</option>
+      </select>
+      <span class="tier-badge" id="tier-badge">—</span>
+    </div>
+    &nbsp;|&nbsp;
+    <div class="status-dot"></div>
+    <span>LIVE</span>
+    &nbsp;|&nbsp;
+    <a href="/" style="color:var(--dim);text-decoration:none;font-size:10px;">← GLOBAL VIEW</a>
+  </div>
+</header>
+
+<!-- ── Left: satellite list ── -->
+<div class="left-panel">
+  <div class="panel-header">
+    FLEET
+    <span class="count" id="fleet-count">—</span>
+  </div>
+  <div class="sat-list" id="sat-list">
+    <div class="loading"><div class="spinner"></div>Loading fleet...</div>
+  </div>
+</div>
+
+<!-- ── Main ── -->
+<div class="main">
+  <div class="main-tabs">
+    <div class="tab active" onclick="showTab('overview')">Overview</div>
+    <div class="tab" onclick="showTab('conjunctions')">Conjunctions</div>
+    <div class="tab" onclick="showTab('alerts')">Alerts</div>
+    <div class="tab" onclick="showTab('simulation')">Simulation</div>
+    <div class="tab" onclick="showTab('threatfeed')">Threat Feed</div>
+    <div class="tab" onclick="showTab('events')">Event Log</div>
+  </div>
+
+  <!-- OVERVIEW -->
+  <div class="tab-content active" id="tab-overview">
+    <div class="cards-grid">
+      <div class="metric-card blue">
+        <div class="metric-label">Fleet Size</div>
+        <div class="metric-value accent" id="ov-fleet">—</div>
+        <div class="metric-sub">tracked objects</div>
+      </div>
+      <div class="metric-card red">
+        <div class="metric-label">Active Alerts</div>
+        <div class="metric-value red" id="ov-alerts">—</div>
+        <div class="metric-sub" id="ov-alerts-sub">—</div>
+      </div>
+      <div class="metric-card orange">
+        <div class="metric-label">Conjunctions</div>
+        <div class="metric-value orange" id="ov-conj">—</div>
+        <div class="metric-sub">next 24h</div>
+      </div>
+      <div class="metric-card green">
+        <div class="metric-label">Remediation</div>
+        <div class="metric-value" id="ov-rem">—</div>
+        <div class="metric-sub">targets queued</div>
+      </div>
+    </div>
+    <div style="background:var(--panel);border:1px solid var(--border);padding:16px;margin-bottom:14px;">
+      <div class="panel-header" style="padding:0 0 12px;margin-bottom:12px;">OPERATOR ALERT SUMMARY</div>
+      <div id="ov-alert-list"><div class="empty-state">Select an operator to view alerts</div></div>
+    </div>
+    <div style="background:var(--panel);border:1px solid var(--border);padding:16px;">
+      <div class="panel-header" style="padding:0 0 12px;margin-bottom:12px;">MANEUVER PLAN</div>
+      <div id="ov-maneuver-list"><div class="empty-state">No maneuvers scheduled</div></div>
+    </div>
+  </div>
+
+  <!-- CONJUNCTIONS -->
+  <div class="tab-content" id="tab-conjunctions">
+    <div style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-family:var(--sans);font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:var(--dim);">ACTIVE CONJUNCTION EVENTS</span>
+      <button class="btn btn-accent" onclick="exportCDM()">⬇ EXPORT CDM</button>
+    </div>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>OBJ-1</th><th>OBJ-2</th><th>TCA (UTC)</th><th>TCA +h</th>
+          <th>Miss km</th><th>P(c)</th><th>ΔV m/s</th><th>Risk</th><th>CDM</th>
+        </tr>
+      </thead>
+      <tbody id="conj-tbody">
+        <tr><td colspan="9"><div class="empty-state">Loading conjunctions...</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ALERTS -->
+  <div class="tab-content" id="tab-alerts">
+    <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-accent" style="font-size:10px;" onclick="filterAlerts('ALL')">ALL</button>
+      <button class="btn" style="color:var(--red);border-color:var(--red);font-size:10px;" onclick="filterAlerts('CRITICAL')">CRITICAL</button>
+      <button class="btn" style="color:var(--orange);border-color:var(--orange);font-size:10px;" onclick="filterAlerts('HIGH')">HIGH</button>
+      <button class="btn" style="color:var(--yellow);border-color:var(--yellow);font-size:10px;" onclick="filterAlerts('MEDIUM')">MEDIUM</button>
+    </div>
+    <div id="alert-list"><div class="empty-state">Loading alerts...</div></div>
+  </div>
+
+  <!-- SIMULATION -->
+  <div class="tab-content" id="tab-simulation">
+    <div style="margin-bottom:16px;">
+      <div style="font-family:var(--sans);font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:var(--dim);margin-bottom:12px;">FRAGMENTATION SCENARIOS</div>
+      <div class="scenario-grid" id="scenario-grid">
+        <div class="loading"><div class="spinner"></div>Loading scenarios...</div>
+      </div>
+    </div>
+    <div id="sim-result">
+      <div style="font-family:var(--sans);font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:var(--dim);margin-bottom:12px;">SIMULATION RESULT</div>
+      <div class="cards-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px;">
+        <div class="metric-card red">
+          <div class="metric-label">Kessler Score</div>
+          <div class="metric-value" id="sim-kessler" style="font-size:32px;">—</div>
+          <div class="kessler-bar"><div class="kessler-fill" id="kessler-fill" style="width:0%"></div></div>
+          <div class="metric-sub">/ 100</div>
+        </div>
+        <div class="metric-card orange">
+          <div class="metric-label">Fragments</div>
+          <div class="metric-value orange" id="sim-frags">—</div>
+          <div class="metric-sub">&gt;10cm tracked</div>
+        </div>
+        <div class="metric-card blue">
+          <div class="metric-label">Sats Threatened</div>
+          <div class="metric-value accent" id="sim-sats">—</div>
+          <div class="metric-sub" id="sim-peak-time">—</div>
+        </div>
+        <div class="metric-card green">
+          <div class="metric-label">Mitigation Window</div>
+          <div class="metric-value green" id="sim-window">—</div>
+          <div class="metric-sub">hours</div>
+        </div>
+      </div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text);line-height:1.6;background:rgba(0,0,0,0.3);padding:12px;border-left:2px solid var(--orange);margin-bottom:16px;" id="sim-summary"></div>
+      <div style="font-family:var(--sans);font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--dim);margin-bottom:8px;">CASCADE PROGRESSION</div>
+      <div class="cascade-timeline" id="cascade-timeline"></div>
+      <div style="font-family:var(--sans);font-size:10px;letter-spacing:0.15em;text-transform:uppercase;color:var(--dim);margin:16px 0 8px;">OPERATOR ALERT SEQUENCE</div>
+      <div class="alert-seq" id="alert-seq"></div>
+    </div>
+    <div id="sim-loading" style="display:none;">
+      <div class="loading"><div class="spinner"></div>Running simulation...</div>
+    </div>
+  </div>
+
+  <!-- THREAT FEED -->
+  <div class="tab-content" id="tab-threatfeed">
+    <div style="background:rgba(255,45,85,0.06);border:1px solid rgba(255,45,85,0.2);padding:10px 14px;margin-bottom:16px;font-family:var(--mono);font-size:10px;">
+      <span style="color:var(--red);font-weight:bold;">UNCLASSIFIED</span> // ASTRUM OPEN SOURCE INTELLIGENCE FEED
+      &nbsp;|&nbsp; Threat indicators are algorithmic scores. Route HIGH/CONFIRMED to authorized analysts.
+    </div>
+    <div id="threat-list"><div class="empty-state">Loading threat feed...</div></div>
+  </div>
+
+  <!-- EVENTS -->
+  <div class="tab-content" id="tab-events">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <span style="font-family:var(--sans);font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:var(--dim);">IMMUTABLE EVENT LEDGER</span>
+      <button class="btn btn-green" onclick="verifyChain()">✓ VERIFY CHAIN</button>
+    </div>
+    <div id="chain-status" style="display:none;margin-bottom:12px;padding:10px 14px;font-family:var(--mono);font-size:11px;"></div>
+    <table class="data-table">
+      <thead>
+        <tr><th>Time</th><th>Event Type</th><th>Details</th><th>Hash</th></tr>
+      </thead>
+      <tbody id="events-tbody">
+        <tr><td colspan="4"><div class="empty-state">Loading events...</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── Right: satellite detail ── -->
+<div class="right-panel">
+  <div class="detail-header">
+    <div class="detail-sat-name" id="detail-name">SELECT A SATELLITE</div>
+    <div class="detail-norad" id="detail-norad">NO OBJECT SELECTED</div>
+  </div>
+  <div class="detail-body" id="detail-body">
+    <div class="empty-state" style="margin-top:40px;">Click a satellite<br>to view telemetry</div>
+  </div>
+</div>
+
+</div><!-- .shell -->
+
+<script>
+const API = '';
+let currentOp = null;
+let allConjs = [];
+let alertFilter = 'ALL';
+
+// ── Clock ──────────────────────────────────────────────────────────────────
+function updateClock() {
+  document.getElementById('clock').textContent =
+    new Date().toUTCString().split(' ')[4] + ' UTC';
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ── SSE ───────────────────────────────────────────────────────────────────
+let es;
+function connectSSE() {
+  es = new EventSource(API + '/api/stream');
+  es.addEventListener('connected', () => {
+    document.getElementById('sse-dot').className = 'sse-dot connected';
+    document.getElementById('sse-status').textContent = 'LIVE';
+  });
+  es.addEventListener('refresh', e => {
+    const d = JSON.parse(e.data);
+    refreshAll();
+  });
+  es.addEventListener('simulation', e => {
+    const d = JSON.parse(e.data);
+    console.log('Sim update:', d);
+  });
+  es.onerror = () => {
+    document.getElementById('sse-dot').className = 'sse-dot';
+    document.getElementById('sse-status').textContent = 'reconnecting...';
+    setTimeout(connectSSE, 3000);
+  };
+}
+connectSSE();
+
+// ── Tab navigation ─────────────────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.target.classList.add('active');
+  if (name === 'simulation') loadScenarios();
+  if (name === 'threatfeed') loadThreatFeed();
+  if (name === 'events') loadEvents();
+  if (name === 'conjunctions') loadConjunctions();
+}
+
+// ── Load operators ─────────────────────────────────────────────────────────
+async function loadOperators() {
+  const r = await fetch(API + '/api/operators');
+  const d = await r.json();
+  const sel = document.getElementById('op-select');
+  d.operators.forEach(op => {
+    const opt = document.createElement('option');
+    opt.value = op.operator_id;
+    opt.textContent = op.name + ' (' + op.tier + ')';
+    sel.appendChild(opt);
+  });
+}
+
+async function selectOperator(opId) {
+  if (!opId) { currentOp = null; return; }
+  const r = await fetch(API + '/api/operators/' + opId);
+  currentOp = await r.json();
+  const badge = document.getElementById('tier-badge');
+  badge.textContent = currentOp.tier;
+  badge.className = 'tier-badge tier-' + currentOp.tier;
+  refreshAll();
+}
+
+// ── Main refresh ───────────────────────────────────────────────────────────
+async function refreshAll() {
+  await Promise.all([
+    loadStatus(),
+    loadFleet(),
+    loadAlerts(),
+  ]);
+}
+
+async function loadStatus() {
+  const r = await fetch(API + '/api/status');
+  const d = await r.json();
+  document.getElementById('ov-conj').textContent = d.total_conjunctions || 0;
+  document.getElementById('ov-alerts').textContent = d.alerts?.total_active || 0;
+  document.getElementById('ov-alerts-sub').textContent =
+    (d.alerts?.by_severity?.CRITICAL || 0) + ' critical / ' + (d.alerts?.by_severity?.HIGH || 0) + ' high';
+  document.getElementById('ov-rem').textContent = d.alerts?.remediation_targets || 0;
+}
+
+async function loadFleet() {
+  let url = API + '/api/satellites';
+  if (currentOp) url = API + '/api/operators/' + currentOp.operator_id + '/satellites';
+  const r = await fetch(url);
+  const d = await r.json();
+  const sats = currentOp ? d.satellites : Object.entries(d.satellites).map(([name, info]) => ({name, ...info}));
+  document.getElementById('fleet-count').textContent = sats.length || Object.keys(d.satellites || {}).length;
+  document.getElementById('ov-fleet').textContent = sats.length || Object.keys(d.satellites || {}).length;
+  renderFleet(currentOp ? sats : d.satellites);
+}
+
+function renderFleet(data) {
+  const container = document.getElementById('sat-list');
+  const items = Array.isArray(data) ? data : Object.entries(data).map(([name, info]) => ({name, ...info}));
+  if (!items.length) { container.innerHTML = '<div class="empty-state">No satellites registered</div>'; return; }
+  container.innerHTML = items.map((sat, i) => {
+    const name = sat.name || sat;
+    const alt = sat.altitude_km ? Math.round(sat.altitude_km) : '—';
+    const cat = sat.category || '—';
+    const hasAlert = sat.alert_count > 0;
+    return `<div class="sat-item" onclick="showSatDetail('${name.replace(/'/g,"\\'")}', this)">
+      <div class="sat-name">${name}</div>
+      <div class="sat-meta">
+        <span>${alt}km</span>
+        <span>${cat}</span>
+        <span>${sat.norad_id || ''}</span>
+      </div>
+      <span class="sat-status nominal">NOMINAL</span>
+    </div>`;
+  }).join('');
+}
+
+// ── Satellite detail ───────────────────────────────────────────────────────
+async function showSatDetail(name, el) {
+  document.querySelectorAll('.sat-item').forEach(e => e.classList.remove('active'));
+  if (el) el.classList.add('active');
+  document.getElementById('detail-name').textContent = name;
+
+  const r = await fetch(API + '/api/satellites');
+  const d = await r.json();
+  const sat = d.satellites[name];
+  if (!sat) { document.getElementById('detail-norad').textContent = 'No telemetry'; return; }
+
+  document.getElementById('detail-norad').textContent = 'NORAD ' + (sat.norad_id || '—');
+
+  const manR = await fetch(API + '/api/maneuver-plan/satellite/' + encodeURIComponent(name));
+  const manD = await manR.json();
+  const recs = manD.recommendations || [];
+  const casc = manD.cascade_analysis || {};
+
+  document.getElementById('detail-body').innerHTML = `
+    <div class="detail-section">
+      <div class="detail-section-title">Orbital State</div>
+      <div class="kv-row"><span class="kv-key">Altitude</span><span class="kv-value accent">${sat.altitude_km ? sat.altitude_km.toFixed(1) : '—'} km</span></div>
+      <div class="kv-row"><span class="kv-key">Speed</span><span class="kv-value">${sat.speed_kms ? sat.speed_kms.toFixed(3) : '—'} km/s</span></div>
+      <div class="kv-row"><span class="kv-key">Category</span><span class="kv-value">${sat.category || '—'}</span></div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">Position ECI (km)</div>
+      <div class="kv-row"><span class="kv-key">X</span><span class="kv-value">${sat.position ? sat.position[0].toFixed(1) : '—'}</span></div>
+      <div class="kv-row"><span class="kv-key">Y</span><span class="kv-value">${sat.position ? sat.position[1].toFixed(1) : '—'}</span></div>
+      <div class="kv-row"><span class="kv-key">Z</span><span class="kv-value">${sat.position ? sat.position[2].toFixed(1) : '—'}</span></div>
+    </div>
+    <div class="detail-section">
+      <div class="detail-section-title">Cascade Risk</div>
+      <div class="kv-row"><span class="kv-key">Degree</span><span class="kv-value accent">${casc.degree || 0}</span></div>
+      <div class="kv-row"><span class="kv-key">Cascade Mult</span><span class="kv-value ${(casc.cascade_multiplier||0)>2?'red':''}">${casc.cascade_multiplier ? casc.cascade_multiplier.toFixed(1) : '—'}×</span></div>
+      <div class="kv-row"><span class="kv-key">Shell Density</span><span class="kv-value">${casc.shell_density || '—'}</span></div>
+    </div>
+    ${recs.length ? `
+    <div class="detail-section">
+      <div class="detail-section-title">Maneuver Recommendations (${recs.length})</div>
+      ${recs.map(r => `
+        <div style="margin-bottom:10px;padding:8px;background:rgba(0,100,255,0.06);border:1px solid var(--border);">
+          <div style="font-family:var(--mono);font-size:10px;color:var(--dim);margin-bottom:4px;">${r.avoidance_pair || ''}</div>
+          <div class="kv-row"><span class="kv-key">ΔV</span><span class="kv-value accent">${r.delta_v_ms ? r.delta_v_ms.toFixed(3) : '—'} m/s</span></div>
+          <div class="kv-row"><span class="kv-key">Axis</span><span class="kv-value">${r.burn_axis_ric || '—'}</span></div>
+          <div class="kv-row"><span class="kv-key">Priority</span><span class="kv-value">${r.priority || '—'}</span></div>
+        </div>`).join('')}
+    </div>` : ''}
+    <div class="detail-section">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
+        <button class="btn btn-accent" onclick="fetchCDMForSat('${name.replace(/'/g,"\\'")}')">CDM EXPORT</button>
+      </div>
+    </div>
+  `;
+}
+
+// ── Conjunctions ───────────────────────────────────────────────────────────
+async function loadConjunctions() {
+  const r = await fetch(API + '/api/conjunctions?hours=24');
+  const d = await r.json();
+  allConjs = d.conjunctions;
+  const tbody = document.getElementById('conj-tbody');
+  if (!allConjs.length) {
+    tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state">No conjunctions detected</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = allConjs.map((c, i) => `
+    <tr>
+      <td style="font-family:var(--sans);font-weight:600;">${c.sat_a}</td>
+      <td style="font-family:var(--sans);font-weight:600;color:var(--dim);">${c.sat_b}</td>
+      <td style="font-family:var(--mono);font-size:10px;">${new Date(c.tca).toUTCString().slice(4,25)}</td>
+      <td style="color:${c.tca_relative_hours<2?'var(--red)':'var(--text)'};">${c.tca_relative_hours.toFixed(1)}h</td>
+      <td>${c.miss_distance_km.toFixed(2)}</td>
+      <td style="font-family:var(--mono);font-size:10px;">${c.probability.toExponential(1)}</td>
+      <td>${c.delta_v_cost_ms ? c.delta_v_cost_ms.toFixed(3) : '—'}</td>
+      <td><span class="risk-pill risk-${c.risk_level}">${c.risk_level}</span></td>
+      <td><button class="btn btn-accent" style="padding:3px 8px;font-size:9px;" onclick="window.open('${API}/api/cdm/${i}')">CDM</button></td>
+    </tr>`).join('');
+}
+
+async function exportCDM() {
+  window.open(API + '/api/cdm/all');
+}
+
+async function fetchCDMForSat(name) {
+  const r = await fetch(API + '/api/conjunctions?hours=24');
+  const d = await r.json();
+  const idx = d.conjunctions.findIndex(c => c.sat_a === name || c.sat_b === name);
+  if (idx >= 0) window.open(API + '/api/cdm/' + idx);
+  else alert('No conjunction found for ' + name + ' in next 24h');
+}
+
+// ── Alerts ─────────────────────────────────────────────────────────────────
+const SEV_COLOR = {CRITICAL:'var(--red)',HIGH:'var(--orange)',MEDIUM:'var(--yellow)',INFO:'var(--dim)'};
+
+async function loadAlerts() {
+  let url = API + '/api/alerts?status=ACTIVE&limit=50';
+  if (currentOp) url = API + '/api/operators/' + currentOp.operator_id + '/alerts';
+  const r = await fetch(url);
+  const d = await r.json();
+  const alerts = d.alerts || [];
+  renderAlerts(alerts);
+  renderOverviewAlerts(alerts);
+}
+
+function filterAlerts(sev) {
+  alertFilter = sev;
+  loadAlerts();
+}
+
+function renderAlerts(alerts) {
+  const container = document.getElementById('alert-list');
+  const filtered = alertFilter === 'ALL' ? alerts : alerts.filter(a => a.severity === alertFilter);
+  if (!filtered.length) { container.innerHTML = '<div class="empty-state">No alerts</div>'; return; }
+  container.innerHTML = filtered.map(a => `
+    <div style="background:var(--panel);border:1px solid var(--border);border-left:3px solid ${SEV_COLOR[a.severity]||'var(--dim)'};margin-bottom:8px;padding:12px 14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <span style="font-family:var(--sans);font-size:13px;font-weight:600;">${a.title}</span>
+        <div style="display:flex;gap:6px;">
+          <span class="risk-pill risk-${a.severity}">${a.severity}</span>
+          <span style="font-family:var(--mono);font-size:9px;color:var(--dim);">${new Date(a.generated_at||'').toUTCString().slice(4,25)}</span>
+        </div>
+      </div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--dim);line-height:1.5;">${a.summary}</div>
+      ${a.status === 'ACTIVE' ? `
+      <div style="margin-top:8px;display:flex;gap:6px;">
+        <button class="btn btn-accent" style="font-size:9px;padding:3px 8px;" onclick="ackAlert('${a.alert_id}')">ACK</button>
+        <button class="btn btn-green" style="font-size:9px;padding:3px 8px;" onclick="resolveAlert('${a.alert_id}')">RESOLVE</button>
+      </div>` : `<div style="margin-top:6px;font-family:var(--mono);font-size:9px;color:var(--green);">✓ ${a.status}</div>`}
+    </div>`).join('');
+}
+
+function renderOverviewAlerts(alerts) {
+  const container = document.getElementById('ov-alert-list');
+  if (!alerts.length) { container.innerHTML = '<div class="empty-state">No active alerts</div>'; return; }
+  container.innerHTML = alerts.slice(0,5).map(a => `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(26,37,64,0.4);">
+      <span class="risk-pill risk-${a.severity}" style="flex-shrink:0;">${a.severity}</span>
+      <span style="font-family:var(--sans);font-size:12px;font-weight:500;flex:1;">${a.title}</span>
+      <span style="font-family:var(--mono);font-size:10px;color:var(--dim);">${a.alert_type}</span>
+    </div>`).join('');
+}
+
+async function ackAlert(id) {
+  const op = currentOp ? currentOp.name : 'OPERATOR-PORTAL';
+  await fetch(API + '/api/alerts/' + id + '/acknowledge', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({operator:op})});
+  loadAlerts();
+}
+
+async function resolveAlert(id) {
+  await fetch(API + '/api/alerts/' + id + '/resolve', {method:'POST'});
+  loadAlerts();
+}
+
+// ── Simulation ─────────────────────────────────────────────────────────────
+async function loadScenarios() {
+  const r = await fetch(API + '/api/simulate/scenarios');
+  const d = await r.json();
+  const grid = document.getElementById('scenario-grid');
+  const typeColors = {ASAT_TEST:'var(--red)',HYPERVELOCITY:'var(--orange)',BATTERY_EXPLOSION:'var(--yellow)',SOLAR_PANEL_SHED:'var(--dim)'};
+  grid.innerHTML = d.scenarios.map(s => `
+    <div class="scenario-card" onclick="runScenario('${s.name}')">
+      <div class="scenario-type ${s.scenario_type}" style="color:${typeColors[s.scenario_type]||'var(--dim)'};">${s.scenario_type.replace(/_/g,' ')}</div>
+      <div class="scenario-name">${s.label}</div>
+      <div class="scenario-meta">${s.altitude_km}km altitude</div>
+    </div>`).join('');
+}
+
+async function runScenario(name) {
+  document.getElementById('sim-loading').style.display = 'block';
+  document.getElementById('sim-result').classList.remove('visible');
+  const r = await fetch(API + '/api/simulate/run', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scenario:name})});
+  const d = await r.json();
+  document.getElementById('sim-loading').style.display = 'none';
+  renderSimResult(d);
+}
+
+function renderSimResult(d) {
+  const score = Math.round(d.kessler_risk_score);
+  const color = score > 70 ? 'var(--red)' : score > 40 ? 'var(--orange)' : 'var(--green)';
+  document.getElementById('sim-kessler').textContent = score;
+  document.getElementById('sim-kessler').style.color = color;
+  document.getElementById('kessler-fill').style.width = score + '%';
+  document.getElementById('sim-frags').textContent = d.event.fragment_count;
+  document.getElementById('sim-sats').textContent = d.total_affected_satellites;
+  document.getElementById('sim-peak-time').textContent = 'peak at T+' + d.peak_at_hours + 'h';
+  document.getElementById('sim-window').textContent = Math.round(d.mitigation_window_hours);
+  document.getElementById('sim-summary').textContent = d.summary;
+
+  // Cascade timeline bars
+  const maxConj = Math.max(...d.cascade_snapshots.map(s => s.new_conjunctions), 1);
+  document.getElementById('cascade-timeline').innerHTML = d.cascade_snapshots.map(s => {
+    const h = Math.max(4, (s.new_conjunctions / maxConj) * 80);
+    const c = s.new_conjunctions > 0 ? 'var(--orange)' : 'var(--border)';
+    return `<div class="timeline-bar-wrap">
+      <div class="timeline-bar" style="height:${h}px;background:${c}20;border-color:${c}40;"></div>
+      <div class="timeline-label">T+${s.t_plus_hours<24?s.t_plus_hours+'h':Math.round(s.t_plus_hours/24)+'d'}</div>
+    </div>`;
+  }).join('');
+
+  // Alert sequence
+  const seq = document.getElementById('alert-seq');
+  seq.innerHTML = d.operator_alert_sequence.map(a => `
+    <div class="alert-row">
+      <span class="alert-time">T+${a.t_plus_minutes}m</span>
+      <span class="alert-op">${a.operator}</span>
+      <span class="alert-sat">${a.satellite} ← ${a.threat_fragment.split(' ').slice(-1)[0]}</span>
+      <span class="alert-level"><span class="risk-pill risk-${a.alert_level}">${a.alert_level}</span></span>
+    </div>`).join('');
+
+  document.getElementById('sim-result').classList.add('visible');
+}
+
+// ── Threat Feed ─────────────────────────────────────────────────────────────
+async function loadThreatFeed() {
+  const r = await fetch(API + '/api/threat-feed');
+  const d = await r.json();
+  const container = document.getElementById('threat-list');
+  const assessments = d.threat_assessments || [];
+  if (!assessments.length) { container.innerHTML = '<div class="empty-state">No active threat assessments</div>'; return; }
+  container.innerHTML = assessments.map(a => {
+    const ta = a.threat_assessment || {};
+    const score = ta.composite_threat_score || 0;
+    return `
+    <div class="threat-card threat-indicator-${ta.threat_indicator||'LOW'}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <span style="font-family:var(--sans);font-size:14px;font-weight:700;">${a.title}</span>
+        <span class="risk-pill risk-${a.severity}">${ta.threat_indicator||'—'}</span>
+      </div>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-bottom:10px;">${a.summary}</div>
+      ${ta.composite_threat_score !== undefined ? `
+      <div class="threat-score-bar">
+        <div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--dim);margin-bottom:4px;">
+          <span>Composite threat score</span><span style="color:var(--red);">${score.toFixed(3)}</span>
+        </div>
+        <div class="threat-bar-bg"><div class="threat-bar-fill" style="width:${Math.min(100,score*100)}%"></div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px;">
+        <div style="text-align:center;">
+          <div style="font-family:var(--mono);font-size:14px;color:var(--red);">${(ta.cloud_asymmetry_score||0).toFixed(2)}</div>
+          <div style="font-family:var(--sans);font-size:9px;color:var(--dim);">ASYMMETRY</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-family:var(--mono);font-size:14px;color:var(--orange);">${(ta.mass_distribution_anomaly||0).toFixed(2)}</div>
+          <div style="font-family:var(--sans);font-size:9px;color:var(--dim);">MASS ANOM</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-family:var(--mono);font-size:14px;color:var(--yellow);">${(ta.timing_correlation||0).toFixed(2)}</div>
+          <div style="font-family:var(--sans);font-size:9px;color:var(--dim);">TIMING CORR</div>
+        </div>
+      </div>` : ''}
+      ${ta.notes ? `<div style="margin-top:10px;font-family:var(--mono);font-size:10px;color:var(--dim);border-top:1px solid var(--border);padding-top:8px;">${ta.notes}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ── Events ──────────────────────────────────────────────────────────────────
+async function loadEvents() {
+  const r = await fetch(API + '/api/events?limit=50');
+  const d = await r.json();
+  const tbody = document.getElementById('events-tbody');
+  if (!d.events.length) { tbody.innerHTML = '<tr><td colspan="4"><div class="empty-state">No events</div></td></tr>'; return; }
+  tbody.innerHTML = [...d.events].reverse().map(e => `
+    <tr>
+      <td style="font-family:var(--mono);font-size:10px;white-space:nowrap;">${new Date(e.timestamp).toUTCString().slice(4,25)}</td>
+      <td><span style="font-family:var(--sans);font-size:11px;font-weight:600;">${e.event_type.replace(/_/g,' ')}</span></td>
+      <td style="font-family:var(--mono);font-size:10px;color:var(--dim);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${JSON.stringify(e.payload).slice(0,80)}</td>
+      <td style="font-family:var(--mono);font-size:9px;color:var(--dim);">${e.entry_hash.slice(0,12)}…</td>
+    </tr>`).join('');
+}
+
+async function verifyChain() {
+  const r = await fetch(API + '/api/events/chain-verify');
+  const d = await r.json();
+  const el = document.getElementById('chain-status');
+  el.style.display = 'block';
+  el.style.background = d.valid ? 'rgba(0,255,136,0.06)' : 'rgba(255,45,85,0.1)';
+  el.style.border = d.valid ? '1px solid rgba(0,255,136,0.2)' : '1px solid rgba(255,45,85,0.3)';
+  el.style.color = d.valid ? 'var(--green)' : 'var(--red)';
+  el.textContent = d.valid
+    ? `✓ CHAIN INTEGRITY VERIFIED — ${d.entries_verified} entries | Head: ${d.head_hash.slice(0,24)}…`
+    : `✗ CHAIN BROKEN at entry ${d.broken_at_index}`;
+}
+
+// ── Maneuver plan for overview ──────────────────────────────────────────────
+async function loadManeuverOverview() {
+  const r = await fetch(API + '/api/maneuver-plan');
+  const d = await r.json();
+  const container = document.getElementById('ov-maneuver-list');
+  const recs = d.recommendations || [];
+  if (!recs.length) { container.innerHTML = '<div class="empty-state">No active maneuver recommendations</div>'; return; }
+  container.innerHTML = `<div style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-bottom:8px;">Total ΔV budget: ${d.total_delta_v_ms ? d.total_delta_v_ms.toFixed(2) : '—'} m/s across ${recs.length} maneuvers</div>` +
+    recs.slice(0,5).map(r => `
+    <div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid rgba(26,37,64,0.4);">
+      <span style="font-family:var(--sans);font-size:12px;font-weight:600;flex:1;">${r.sat_name}</span>
+      <span style="font-family:var(--mono);font-size:11px;color:var(--accent);">${r.delta_v_ms ? r.delta_v_ms.toFixed(3) : '—'} m/s</span>
+      <span style="font-family:var(--mono);font-size:10px;color:var(--dim);">${r.burn_axis_ric || '—'}</span>
+      <span class="risk-pill risk-${r.priority==='CRITICAL'?'CRITICAL':r.priority==='HIGH'?'HIGH':'MEDIUM'}">${r.priority||'—'}</span>
+    </div>`).join('');
+}
+
+// ── Boot ─────────────────────────────────────────────────────────────────────
+async function init() {
+  await loadOperators();
+  await refreshAll();
+  await loadManeuverOverview();
+}
+
+init();
+setInterval(refreshAll, 30000);
+</script>
+</body>
+</html>

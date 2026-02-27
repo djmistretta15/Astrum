@@ -1,4 +1,4 @@
-# CUSTODES — Orbital Control Stack
+# ASTRUM — Orbital Conjunction Scheduler
 
 **The first multi-player conjunction avoidance scheduler for space.**
 

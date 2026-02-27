@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ASTRUM — Orbital Control Stack</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Orbitron:wght@400;700;900&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+  /* ─── DESIGN TOKENS ─── */
+  :root {
+    --void: #02040a;
+    --deep: #060c18;
+    --surface: #0a1628;
+    --panel: #0d1f38;
+    --border: #1a3a5c;
+    --accent-cyan: #00d4ff;
+    --accent-blue: #0066ff;
+    --accent-amber: #ffb800;
+    --accent-red: #ff2d55;
+    --accent-green: #00ff88;
+    --accent-purple: #9945ff;
+    --text-primary: #e8f4ff;
+    --text-secondary: #7a9fcc;
+    --text-dim: #3d6080;
+    --critical: #ff2d55;
+    --high: #ff6b35;
+    --medium: #ffb800;
+    --low: #00ff88;
+    --font-mono: 'Space Mono', monospace;
+    --font-display: 'Orbitron', sans-serif;
+    --font-body: 'Inter', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    background: var(--void);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ─── STAR FIELD ─── */
+  #starfield {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  /* ─── LAYOUT ─── */
+  .layout {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    min-height: 100vh;
+  }
+
+  /* ─── HEADER ─── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(0,212,255,0.04) 0%, transparent 100%);
+    backdrop-filter: blur(20px);
+  }
+
+  .logo-area {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .logo-emblem {
+    width: 44px;
+    height: 44px;
+    position: relative;
+  }
+
+  .logo-emblem svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .logo-text h1 {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: 0.25em;
+    color: var(--accent-cyan);
+    text-shadow: 0 0 20px rgba(0,212,255,0.5);
+  }
+
+  .logo-text p {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  .header-status {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+    background: rgba(10, 22, 40, 0.8);
+  }
+
+  .pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    box-shadow: 0 0 8px var(--accent-green);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.8); }
+  }
+
+  .utc-clock {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--accent-cyan);
+    letter-spacing: 0.1em;
+  }
+
+  .refresh-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 18px;
+    background: rgba(0, 212, 255, 0.08);
+    border: 1px solid rgba(0, 212, 255, 0.3);
+    border-radius: 6px;
+    color: var(--accent-cyan);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+    letter-spacing: 0.1em;
+    transition: all 0.2s;
+  }
+
+  .refresh-btn:hover {
+    background: rgba(0, 212, 255, 0.15);
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 12px rgba(0,212,255,0.2);
+  }
+
+  /* ─── MAIN GRID ─── */
+  .main {
+    display: grid;
+    grid-template-columns: 320px 1fr 320px;
+    grid-template-rows: auto 1fr;
+    gap: 0;
+    padding: 0;
+    height: calc(100vh - 85px);
+  }
+
+  /* ─── METRIC STRIP ─── */
+  .metric-strip {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .metric-card {
+    padding: 18px 24px;
+    border-right: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+    transition: background 0.3s;
+  }
+
+  .metric-card:last-child { border-right: none; }
+
+  .metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent-line, var(--accent-cyan));
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .metric-card:hover::before { opacity: 1; }
+  .metric-card:hover { background: rgba(0,212,255,0.03); }
+
+  .metric-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .metric-value {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1;
+    transition: color 0.3s;
+  }
+
+  .metric-sub {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+
+  .metric-critical { --accent-line: var(--critical); }
+  .metric-high { --accent-line: var(--high); }
+  .metric-medium { --accent-line: var(--medium); }
+  .metric-low { --accent-line: var(--low); }
+
+  /* ─── LEFT PANEL ─── */
+  .panel-left {
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    background: linear-gradient(180deg, var(--deep) 0%, var(--void) 100%);
+  }
+
+  .panel-right {
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    background: linear-gradient(180deg, var(--deep) 0%, var(--void) 100%);
+  }
+
+  /* ─── CENTER ─── */
+  .panel-center {
+    display: flex;
+    flex-direction: column;
+    background: var(--void);
+    position: relative;
+  }
+
+  /* ─── PANEL HEADERS ─── */
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: inherit;
+    z-index: 2;
+    backdrop-filter: blur(10px);
+  }
+
+  .panel-title {
+    font-family: var(--font-display);
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    color: var(--accent-cyan);
+    text-transform: uppercase;
+  }
+
+  .panel-count {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    background: rgba(0,212,255,0.08);
+    padding: 3px 8px;
+    border-radius: 3px;
+  }
+
+  /* ─── CONJUNCTION LIST ─── */
+  .conjunction-item {
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(26, 58, 92, 0.5);
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+
+  .conjunction-item::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    background: var(--risk-color, var(--low));
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .conjunction-item:hover::before { opacity: 1; }
+  .conjunction-item:hover { background: rgba(0,212,255,0.04); padding-left: 24px; }
+
+  .conj-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .conj-sats {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-primary);
+  }
+
+  .risk-badge {
+    font-family: var(--font-display);
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-weight: 700;
+  }
+
+  .badge-CRITICAL { background: rgba(255,45,85,0.2); color: var(--critical); border: 1px solid rgba(255,45,85,0.4); }
+  .badge-HIGH { background: rgba(255,107,53,0.2); color: var(--high); border: 1px solid rgba(255,107,53,0.4); }
+  .badge-MEDIUM { background: rgba(255,184,0,0.2); color: var(--medium); border: 1px solid rgba(255,184,0,0.4); }
+  .badge-LOW { background: rgba(0,255,136,0.1); color: var(--low); border: 1px solid rgba(0,255,136,0.2); }
+
+  .conj-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+  }
+
+  .conj-stat {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+  }
+
+  .conj-stat-label { color: var(--text-dim); font-family: var(--font-mono); }
+  .conj-stat-value { color: var(--text-secondary); font-family: var(--font-mono); }
+
+  /* ─── ORBIT VISUALIZATION ─── */
+  #orbit-viz {
+    flex: 1;
+    position: relative;
+  }
+
+  #orbit-canvas {
+    width: 100%;
+    height: 100%;
+  }
+
+  .viz-overlay {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    pointer-events: none;
+  }
+
+  .viz-overlay .ol { margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+  .ol-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* ─── RISK GRAPH ─── */
+  #risk-graph-container {
+    height: 340px;
+    position: relative;
+    border-bottom: 1px solid var(--border);
+  }
+
+  #risk-graph-svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* ─── SATELLITE LIST ─── */
+  .sat-item {
+    padding: 12px 20px;
+    border-bottom: 1px solid rgba(26, 58, 92, 0.4);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    align-items: center;
+    transition: background 0.2s;
+    cursor: pointer;
+  }
+
+  .sat-item:hover { background: rgba(0,212,255,0.04); }
+
+  .sat-name {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sat-cat {
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-top: 2px;
+    font-family: var(--font-mono);
+  }
+
+  .sat-alt {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-secondary);
+    text-align: right;
+  }
+
+  .sat-speed {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-dim);
+    text-align: right;
+  }
+
+  /* ─── SCROLLBAR ─── */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--void); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--accent-cyan); }
+
+  /* ─── LOADING STATE ─── */
+  .loading-shimmer {
+    background: linear-gradient(90deg, var(--surface) 25%, var(--panel) 50%, var(--surface) 75%);
+    background-size: 400% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+    border-radius: 4px;
+    height: 14px;
+    margin-bottom: 8px;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  /* ─── TOOLTIP ─── */
+  .tooltip {
+    position: fixed;
+    background: rgba(6, 12, 24, 0.95);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 16px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-primary);
+    pointer-events: none;
+    z-index: 1000;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    display: none;
+    min-width: 200px;
+  }
+
+  .tooltip-title {
+    font-family: var(--font-display);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--accent-cyan);
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 6px;
+  }
+
+  .tooltip-row { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 4px; }
+  .tooltip-key { color: var(--text-dim); }
+  .tooltip-val { color: var(--text-primary); }
+
+  /* ─── ALERTS TICKER ─── */
+  .alert-ticker {
+    grid-column: 1 / -1;
+    height: 32px;
+    border-top: 1px solid var(--border);
+    background: var(--deep);
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+  }
+
+  .ticker-label {
+    padding: 0 16px;
+    font-family: var(--font-display);
+    font-size: 9px;
+    letter-spacing: 0.3em;
+    color: var(--accent-red);
+    border-right: 1px solid var(--border);
+    white-space: nowrap;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    background: rgba(255,45,85,0.08);
+  }
+
+  .ticker-content {
+    display: flex;
+    align-items: center;
+    gap: 40px;
+    white-space: nowrap;
+    animation: scroll-ticker 30s linear infinite;
+    padding-left: 40px;
+  }
+
+  @keyframes scroll-ticker {
+    from { transform: translateX(100vw); }
+    to { transform: translateX(-100%); }
+  }
+
+  .ticker-item {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .ticker-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+  }
+
+  /* ─── SCAN LINE ─── */
+  .scan-line {
+    position: fixed;
+    left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0,212,255,0.15), transparent);
+    pointer-events: none;
+    animation: scan 8s linear infinite;
+    z-index: 0;
+  }
+
+  @keyframes scan {
+    0% { top: 0; opacity: 0; }
+    5% { opacity: 1; }
+    95% { opacity: 1; }
+    100% { top: 100vh; opacity: 0; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="starfield"></canvas>
+<div class="scan-line"></div>
+<div class="tooltip" id="tooltip"></div>
+
+<div class="layout">
+  <header>
+    <div class="logo-area">
+      <div class="logo-emblem">
+        <svg viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="22" cy="22" r="20" stroke="#00d4ff" stroke-width="1" opacity="0.4"/>
+          <circle cx="22" cy="22" r="14" stroke="#00d4ff" stroke-width="1" opacity="0.6"/>
+          <circle cx="22" cy="22" r="4" fill="#00d4ff" opacity="0.9"/>
+          <ellipse cx="22" cy="22" rx="20" ry="8" stroke="#0066ff" stroke-width="1" opacity="0.5" transform="rotate(-30 22 22)"/>
+          <ellipse cx="22" cy="22" rx="20" ry="8" stroke="#0066ff" stroke-width="1" opacity="0.3" transform="rotate(30 22 22)"/>
+          <circle cx="34" cy="12" r="2.5" fill="#00d4ff"/>
+          <circle cx="8" cy="30" r="1.5" fill="#ff2d55"/>
+        </svg>
+      </div>
+      <div class="logo-text">
+        <h1>ASTRUM</h1>
+        <p>Orbital Scheduler · v0.1.0 Alpha</p>
+      </div>
+    </div>
+    <div class="header-status">
+      <div class="status-pill"><div class="pulse-dot"></div>SYSTEMS NOMINAL</div>
+      <div class="utc-clock" id="utc-clock">--:--:-- UTC</div>
+      <button class="refresh-btn" onclick="refreshAll()">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+          <path d="M10 6A4 4 0 1 1 6 2V0L9 3L6 6V4A2 2 0 1 0 8 6H10Z"/>
+        </svg>
+        REFRESH
+      </button>
+    </div>
+  </header>
+
+  <div class="main">
+    <!-- METRIC STRIP -->
+    <div class="metric-strip">
+      <div class="metric-card metric-critical">
+        <div class="metric-label">CRITICAL</div>
+        <div class="metric-value" id="m-critical" style="color:var(--critical)">—</div>
+        <div class="metric-sub">conjunctions</div>
+      </div>
+      <div class="metric-card metric-high">
+        <div class="metric-label">HIGH RISK</div>
+        <div class="metric-value" id="m-high" style="color:var(--high)">—</div>
+        <div class="metric-sub">conjunctions</div>
+      </div>
+      <div class="metric-card metric-medium">
+        <div class="metric-label">MEDIUM RISK</div>
+        <div class="metric-value" id="m-medium" style="color:var(--medium)">—</div>
+        <div class="metric-sub">conjunctions</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">TRACKED OBJECTS</div>
+        <div class="metric-value" id="m-tracked" style="color:var(--accent-cyan)">—</div>
+        <div class="metric-sub">satellites</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">DELTA-V BUDGET</div>
+        <div class="metric-value" id="m-dv" style="color:var(--accent-blue); font-size:20px;">—</div>
+        <div class="metric-sub">m/s total exposure</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">RISK GRAPH</div>
+        <div class="metric-value" id="m-edges" style="color:var(--accent-purple)">—</div>
+        <div class="metric-sub">active edges</div>
+      </div>
+    </div>
+
+    <!-- LEFT: CONJUNCTION LIST -->
+    <div class="panel-left">
+      <div class="panel-header">
+        <span class="panel-title">Conjunction Events</span>
+        <span class="panel-count" id="conj-count">0</span>
+      </div>
+      <div id="conjunction-list">
+        <div style="padding:20px">
+          <div class="loading-shimmer" style="width:80%"></div>
+          <div class="loading-shimmer" style="width:60%"></div>
+          <div class="loading-shimmer" style="width:70%"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CENTER: ORBIT VIZ + RISK GRAPH -->
+    <div class="panel-center">
+      <div id="orbit-viz">
+        <canvas id="orbit-canvas"></canvas>
+        <div class="viz-overlay" id="viz-overlay">
+          <div class="ol"><div class="ol-dot" style="background:#00d4ff"></div>Cooperative Satellite</div>
+          <div class="ol"><div class="ol-dot" style="background:#ff2d55"></div>Debris / Rogue</div>
+          <div class="ol"><div class="ol-dot" style="background:#ffb800"></div>High Risk Pair</div>
+          <div class="ol" style="margin-top:8px; color:#3d6080; font-size:9px">EARTH RADIUS: 6,371 km</div>
+        </div>
+      </div>
+      <div id="risk-graph-container">
+        <div class="panel-header">
+          <span class="panel-title">Conjunction Risk Graph</span>
+          <span class="panel-count" id="graph-info">nodes / edges</span>
+        </div>
+        <svg id="risk-graph-svg"></svg>
+      </div>
+    </div>
+
+    <!-- RIGHT: SATELLITE LIST -->
+    <div class="panel-right">
+      <div class="panel-header">
+        <span class="panel-title">Tracked Objects</span>
+        <span class="panel-count" id="sat-count">0</span>
+      </div>
+      <div id="satellite-list">
+        <div style="padding:20px">
+          <div class="loading-shimmer"></div>
+          <div class="loading-shimmer" style="width:75%"></div>
+          <div class="loading-shimmer" style="width:85%"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TICKER -->
+<div class="alert-ticker">
+  <div class="ticker-label">⬤ LIVE ALERTS</div>
+  <div class="ticker-content" id="ticker-content">
+    <div class="ticker-item"><div class="ticker-dot" style="background:#00ff88"></div>System initializing...</div>
+  </div>
+</div>
+
+<script>
+// ─── STARFIELD ───
+const canvas = document.getElementById('starfield');
+const ctx = canvas.getContext('2d');
+let stars = [];
+
+function initStars() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  stars = Array.from({length: 200}, () => ({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    r: Math.random() * 1.2,
+    opacity: Math.random() * 0.7 + 0.1,
+    twinkle: Math.random() * 0.02 + 0.005,
+    phase: Math.random() * Math.PI * 2
+  }));
+}
+
+function drawStars(t) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  stars.forEach(s => {
+    const op = s.opacity * (0.7 + 0.3 * Math.sin(t * s.twinkle + s.phase));
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(200, 225, 255, ${op})`;
+    ctx.fill();
+  });
+  requestAnimationFrame(drawStars);
+}
+initStars();
+window.addEventListener('resize', initStars);
+requestAnimationFrame(drawStars);
+
+// ─── UTC CLOCK ───
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getUTCHours()).padStart(2,'0');
+  const m = String(now.getUTCMinutes()).padStart(2,'0');
+  const s = String(now.getUTCSeconds()).padStart(2,'0');
+  document.getElementById('utc-clock').textContent = `${h}:${m}:${s} UTC`;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ─── ORBIT VISUALIZATION ───
+let orbitCanvas = document.getElementById('orbit-canvas');
+let oc = orbitCanvas.getContext('2d');
+let orbitSats = [];
+let orbitConjunctions = [];
+let orbitAngle = 0;
+
+function resizeOrbit() {
+  const container = document.getElementById('orbit-viz');
+  orbitCanvas.width = container.clientWidth;
+  orbitCanvas.height = container.clientHeight;
+}
+
+function drawOrbit() {
+  resizeOrbit();
+  const w = orbitCanvas.width, h = orbitCanvas.height;
+  const cx = w / 2, cy = h / 2;
+  const scale = Math.min(w, h) * 0.35;
+
+  oc.clearRect(0, 0, w, h);
+
+  // Earth glow
+  const earthGrad = oc.createRadialGradient(cx, cy, 0, cx, cy, scale * 0.18);
+  earthGrad.addColorStop(0, 'rgba(0, 100, 200, 0.8)');
+  earthGrad.addColorStop(0.6, 'rgba(0, 60, 120, 0.5)');
+  earthGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  oc.beginPath();
+  oc.arc(cx, cy, scale * 0.18, 0, Math.PI * 2);
+  oc.fillStyle = earthGrad;
+  oc.fill();
+
+  oc.beginPath();
+  oc.arc(cx, cy, scale * 0.15, 0, Math.PI * 2);
+  oc.strokeStyle = 'rgba(0, 150, 255, 0.6)';
+  oc.lineWidth = 1.5;
+  oc.stroke();
+
+  // Orbital shells (altitude rings)
+  const shells = [
+    {alt: 400, label: 'LEO 400km', color: 'rgba(0,212,255,0.08)'},
+    {alt: 550, label: '550km', color: 'rgba(0,102,255,0.08)'},
+    {alt: 780, label: '780km', color: 'rgba(153,69,255,0.06)'},
+    {alt: 1200, label: '1200km', color: 'rgba(0,212,255,0.05)'},
+  ];
+
+  shells.forEach(s => {
+    const r = scale * (0.15 + s.alt / 6371 * 0.9);
+    oc.beginPath();
+    oc.arc(cx, cy, r, 0, Math.PI * 2);
+    oc.strokeStyle = s.color.replace('0.0', '0.2');
+    oc.lineWidth = 1;
+    oc.setLineDash([4, 8]);
+    oc.stroke();
+    oc.setLineDash([]);
+    oc.fillStyle = 'rgba(61, 96, 128, 0.5)';
+    oc.font = '9px Space Mono, monospace';
+    oc.fillText(s.label, cx + r + 4, cy + 4);
+  });
+
+  // Draw conjunction lines first (under satellites)
+  orbitConjunctions.forEach(c => {
+    const sa = orbitSats.find(s => s.name === c.sat_a);
+    const sb = orbitSats.find(s => s.name === c.sat_b);
+    if (!sa || !sb) return;
+    const colors = {CRITICAL: '#ff2d55', HIGH: '#ff6b35', MEDIUM: '#ffb800', LOW: 'rgba(0,255,136,0.3)'};
+    oc.beginPath();
+    oc.moveTo(sa.px, sa.py);
+    oc.lineTo(sb.px, sb.py);
+    oc.strokeStyle = colors[c.risk_level] || '#ffffff';
+    oc.lineWidth = c.risk_level === 'CRITICAL' ? 1.5 : 1;
+    oc.globalAlpha = 0.6;
+    if (c.risk_level === 'LOW') oc.setLineDash([2,6]);
+    oc.stroke();
+    oc.setLineDash([]);
+    oc.globalAlpha = 1.0;
+  });
+
+  // Draw satellites
+  const catColors = {
+    'Starlink': '#00d4ff', 'OneWeb': '#0066ff', 'Station': '#00ff88',
+    'Debris': '#ff2d55', 'Navigation': '#ffb800', 'Weather': '#9945ff',
+    'Comms': '#ff6b35', 'EO': '#00d4ff', 'Other': '#7a9fcc'
+  };
+
+  orbitSats.forEach(s => {
+    const angle = (s.baseAngle + orbitAngle * s.speed) % (Math.PI * 2);
+    const r = scale * (0.15 + s.alt / 6371 * 0.9);
+    const tilt = s.inc * Math.PI / 180;
+    const px = cx + r * Math.cos(angle) * Math.cos(tilt);
+    const py = cy + r * Math.sin(angle);
+    s.px = px;
+    s.py = py;
+
+    const color = catColors[s.category] || '#7a9fcc';
+    const radius = s.category === 'Station' ? 4 : (s.category === 'Debris' ? 2.5 : 3);
+
+    // Glow
+    const grd = oc.createRadialGradient(px, py, 0, px, py, radius * 3);
+    grd.addColorStop(0, color.replace(')', ', 0.4)').replace('rgb', 'rgba').replace('#', 'rgba(') || 'rgba(0,212,255,0.3)');
+    grd.addColorStop(1, 'transparent');
+    oc.beginPath();
+    oc.arc(px, py, radius * 3, 0, Math.PI * 2);
+    oc.fillStyle = grd;
+    oc.fill();
+
+    oc.beginPath();
+    oc.arc(px, py, radius, 0, Math.PI * 2);
+    oc.fillStyle = color;
+    oc.fill();
+  });
+
+  orbitAngle += 0.002;
+  requestAnimationFrame(drawOrbit);
+}
+
+// ─── D3 RISK GRAPH ───
+let graphData = {nodes: [], edges: []};
+
+function drawRiskGraph(data) {
+  const container = document.getElementById('risk-graph-container');
+  const headerH = 49;
+  const w = container.clientWidth;
+  const h = container.clientHeight - headerH;
+
+  const svg = d3.select('#risk-graph-svg')
+    .attr('width', w)
+    .attr('height', h);
+
+  svg.selectAll('*').remove();
+
+  if (!data.nodes.length) return;
+
+  const riskColors = {CRITICAL: '#ff2d55', HIGH: '#ff6b35', MEDIUM: '#ffb800', LOW: 'rgba(0,255,136,0.6)'};
+  const catColors = {
+    'Starlink': '#00d4ff', 'OneWeb': '#0066ff', 'Station': '#00ff88',
+    'Debris': '#ff2d55', 'Navigation': '#ffb800', 'Weather': '#9945ff',
+    'Comms': '#ff6b35', 'EO': '#00bfff', 'Other': '#7a9fcc'
+  };
+
+  const sim = d3.forceSimulation(data.nodes)
+    .force('link', d3.forceLink(data.edges).id(d => d.id).distance(80).strength(0.3))
+    .force('charge', d3.forceManyBody().strength(-120))
+    .force('center', d3.forceCenter(w / 2, h / 2))
+    .force('collision', d3.forceCollide(20));
+
+  const link = svg.append('g').selectAll('line')
+    .data(data.edges).enter().append('line')
+    .attr('stroke', d => riskColors[d.risk_level] || '#1a3a5c')
+    .attr('stroke-width', d => d.weight * 2)
+    .attr('stroke-opacity', 0.7);
+
+  const nodeG = svg.append('g').selectAll('g')
+    .data(data.nodes).enter().append('g')
+    .call(d3.drag()
+      .on('start', (event, d) => { if (!event.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+      .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y; })
+      .on('end', (event, d) => { if (!event.active) sim.alphaTarget(0); d.fx = null; d.fy = null; })
+    );
+
+  nodeG.append('circle')
+    .attr('r', d => 4 + Math.min(d.risk_score * 2, 8))
+    .attr('fill', d => catColors[d.category] || '#7a9fcc')
+    .attr('opacity', 0.9)
+    .on('mouseover', (event, d) => showTooltip(event, d, 'node'))
+    .on('mouseout', hideTooltip);
+
+  nodeG.append('text')
+    .text(d => d.id.length > 12 ? d.id.slice(0, 12) + '…' : d.id)
+    .attr('dy', -8)
+    .attr('text-anchor', 'middle')
+    .attr('font-family', 'Space Mono, monospace')
+    .attr('font-size', 8)
+    .attr('fill', '#7a9fcc')
+    .attr('pointer-events', 'none');
+
+  sim.on('tick', () => {
+    link.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+        .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+    nodeG.attr('transform', d => `translate(${d.x},${d.y})`);
+  });
+
+  document.getElementById('graph-info').textContent = `${data.nodes.length} nodes · ${data.edges.length} edges`;
+}
+
+// ─── TOOLTIP ───
+const tooltip = document.getElementById('tooltip');
+
+function showTooltip(event, d, type) {
+  let html = '';
+  if (type === 'node') {
+    html = `<div class="tooltip-title">${d.id}</div>
+      <div class="tooltip-row"><span class="tooltip-key">Category</span><span class="tooltip-val">${d.category}</span></div>
+      <div class="tooltip-row"><span class="tooltip-key">Altitude</span><span class="tooltip-val">${d.altitude.toFixed(0)} km</span></div>
+      <div class="tooltip-row"><span class="tooltip-key">Risk Score</span><span class="tooltip-val">${d.risk_score.toFixed(2)}</span></div>`;
+  }
+  tooltip.innerHTML = html;
+  tooltip.style.display = 'block';
+  tooltip.style.left = (event.pageX + 12) + 'px';
+  tooltip.style.top = (event.pageY - 10) + 'px';
+}
+function hideTooltip() { tooltip.style.display = 'none'; }
+
+// ─── DATA LOADING ───
+async function loadStatus() {
+  try {
+    const r = await fetch('/api/status');
+    const d = await r.json();
+    document.getElementById('m-critical').textContent = d.by_risk.CRITICAL;
+    document.getElementById('m-high').textContent = d.by_risk.HIGH;
+    document.getElementById('m-medium').textContent = d.by_risk.MEDIUM;
+    document.getElementById('m-tracked').textContent = d.satellites_tracked;
+    document.getElementById('m-dv').textContent = d.total_delta_v_budget.toFixed(1);
+    document.getElementById('m-edges').textContent = d.graph_edges;
+  } catch(e) { console.error('Status error', e); }
+}
+
+async function loadConjunctions() {
+  try {
+    const r = await fetch('/api/conjunctions?hours=24');
+    const d = await r.json();
+    orbitConjunctions = d.conjunctions;
+    document.getElementById('conj-count').textContent = d.total;
+
+    const list = document.getElementById('conjunction-list');
+    if (!d.conjunctions.length) {
+      list.innerHTML = '<div style="padding:20px;color:var(--text-dim);font-family:Space Mono;font-size:11px">No conjunction events detected in 24h window.</div>';
+      return;
+    }
+
+    const riskColors = {CRITICAL: 'var(--critical)', HIGH: 'var(--high)', MEDIUM: 'var(--medium)', LOW: 'var(--low)'};
+
+    list.innerHTML = d.conjunctions.map(c => `
+      <div class="conjunction-item" style="--risk-color:${riskColors[c.risk_level]}" onclick="showCascade('${c.sat_a}')">
+        <div class="conj-header">
+          <div class="conj-sats">${c.sat_a.slice(0,14)}<br><span style="color:var(--text-dim)">↕</span> ${c.sat_b.slice(0,14)}</div>
+          <span class="risk-badge badge-${c.risk_level}">${c.risk_level}</span>
+        </div>
+        <div class="conj-stats">
+          <div class="conj-stat">
+            <span class="conj-stat-label">MISS</span>
+            <span class="conj-stat-value">${c.miss_distance_km.toFixed(1)} km</span>
+          </div>
+          <div class="conj-stat">
+            <span class="conj-stat-label">TCA</span>
+            <span class="conj-stat-value">${c.tca_relative_hours.toFixed(1)}h</span>
+          </div>
+          <div class="conj-stat">
+            <span class="conj-stat-label">Pc</span>
+            <span class="conj-stat-value">${c.probability.toExponential(2)}</span>
+          </div>
+          <div class="conj-stat">
+            <span class="conj-stat-label">ΔV</span>
+            <span class="conj-stat-value">${c.delta_v_cost_ms.toFixed(2)} m/s</span>
+          </div>
+        </div>
+      </div>
+    `).join('');
+
+    // Update ticker
+    const tickerItems = d.conjunctions.slice(0, 6).map(c => {
+      const dotColor = {CRITICAL:'#ff2d55', HIGH:'#ff6b35', MEDIUM:'#ffb800', LOW:'#00ff88'}[c.risk_level];
+      return `<div class="ticker-item"><div class="ticker-dot" style="background:${dotColor}"></div>${c.risk_level}: ${c.sat_a} ↔ ${c.sat_b} · ${c.miss_distance_km.toFixed(1)}km miss · TCA +${c.tca_relative_hours.toFixed(1)}h · ΔV ${c.delta_v_cost_ms.toFixed(2)}m/s</div>`;
+    }).join('');
+    document.getElementById('ticker-content').innerHTML = tickerItems;
+  } catch(e) { console.error('Conjunction error', e); }
+}
+
+async function loadSatellites() {
+  try {
+    const r = await fetch('/api/satellites');
+    const d = await r.json();
+    document.getElementById('sat-count').textContent = d.count;
+
+    const entries = Object.entries(d.satellites);
+    orbitSats = entries.map(([name, s], i) => ({
+      name,
+      category: s.category,
+      alt: s.altitude,
+      speed: s.speed,
+      baseAngle: (i / entries.length) * Math.PI * 2,
+      inc: s.category === 'Navigation' ? 55 : (s.category === 'Station' ? 51.6 : 90),
+      px: 0, py: 0,
+      speed2: 0.3 + (s.speed / 8.0) * 0.7
+    }));
+
+    orbitSats.forEach(s => { s.speed = s.speed2; });
+
+    const list = document.getElementById('satellite-list');
+    list.innerHTML = entries.map(([name, s]) => `
+      <div class="sat-item" onclick="showCascade('${name}')">
+        <div>
+          <div class="sat-name">${name}</div>
+          <div class="sat-cat">${s.category}</div>
+        </div>
+        <div>
+          <div class="sat-alt">${s.altitude.toFixed(0)} km</div>
+          <div class="sat-speed">${s.speed.toFixed(3)} km/s</div>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) { console.error('Satellite error', e); }
+}
+
+async function loadGraph() {
+  try {
+    const r = await fetch('/api/risk-graph');
+    const d = await r.json();
+    graphData = d;
+    drawRiskGraph(d);
+  } catch(e) { console.error('Graph error', e); }
+}
+
+async function showCascade(satName) {
+  try {
+    const encoded = satName.replace(/\s/g, '_').replace('(', '%28').replace(')', '%29');
+    const r = await fetch(`/api/cascade/${encoded}`);
+    const d = await r.json();
+    const msg = `CASCADE: ${satName}\nPrimary affected: ${d.primary_affected.join(', ') || 'none'}\nCascade score: ${d.cascade_score}\nKessler risk: ${d.kessler_risk}`;
+    console.log(msg);
+  } catch(e) {}
+}
+
+async function refreshAll() {
+  const btn = document.querySelector('.refresh-btn');
+  btn.textContent = 'REFRESHING...';
+  try {
+    await fetch('/api/refresh', {method: 'POST'});
+    await Promise.all([loadStatus(), loadConjunctions(), loadSatellites(), loadGraph()]);
+  } finally {
+    btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><path d="M10 6A4 4 0 1 1 6 2V0L9 3L6 6V4A2 2 0 1 0 8 6H10Z"/></svg> REFRESH`;
+  }
+}
+
+// ─── INIT ───
+async function init() {
+  drawOrbit();
+  await Promise.all([loadStatus(), loadConjunctions(), loadSatellites(), loadGraph()]);
+  // Auto-refresh every 60s
+  setInterval(refreshAll, 60000);
+}
+
+window.addEventListener('load', init);
+window.addEventListener('resize', () => drawRiskGraph(graphData));
+</script>
+</body>
+</html>

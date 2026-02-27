@@ -1,0 +1,40 @@
+version: "3.9"
+
+services:
+  astrum:
+    build: .
+    container_name: astrum-core
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    volumes:
+      - tle_cache:/app/tle_cache
+      - astrum_data:/app/data
+      - ./registry.json:/app/registry.json
+      - ./event_log.jsonl:/app/event_log.jsonl
+    environment:
+      - ASTRUM_LIVE_TLE=1
+      - FLASK_ENV=production
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/api/status')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  nginx:
+    image: nginx:alpine
+    container_name: astrum-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      - astrum
+
+volumes:
+  tle_cache:
+  astrum_data:
